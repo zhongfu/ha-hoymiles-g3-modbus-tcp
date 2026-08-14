@@ -8,5 +8,8 @@ venv/
 # HA smoke-test scaffolding
 _ha_test/
 
+# Local Home Assistant test instance config
+hass_config/
+
 # OS
 .DS_Store
