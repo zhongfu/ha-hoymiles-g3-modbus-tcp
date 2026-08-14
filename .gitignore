@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# HA smoke-test scaffolding
+_ha_test/
+
+# OS
+.DS_Store
