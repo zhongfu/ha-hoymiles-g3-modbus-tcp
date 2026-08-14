@@ -32,12 +32,17 @@ via **Settings → Devices & Services → Add Integration**.
 2. Restart Home Assistant.
 3. Add the integration via **Settings → Devices & Services → Add Integration →
    "Hoymiles G3 Modbus TCP"** and enter the Ethernet stick's IP address. The default
-   port is `502`, unit `1`, and the poll interval defaults to `30 s`.
+   port is `502`, unit `1`, and the poll interval defaults to `30 s`. You can change
+   any of these later via **Settings → Devices & Services → ⋯ → Options** on the
+   integration (changes reload the integration to reconnect with the new settings).
 
-> **Dependency:** the pinned `hoymiles-g3-modbus-tcp==0.1.1` is installed
+> **Dependency:** the pinned `hoymiles-g3-modbus-tcp==0.1.2` is installed
 > automatically by Home Assistant on first setup (needs internet). Since 0.1.1 it
 > requires only `pymodbus>=3.13.1`, compatible with the `pymodbus==3.13.1` that Home
 > Assistant ships, so it installs without manual intervention.
+
+> **Requirements:** Home Assistant **2025.8 or newer** (the options flow uses
+> `OptionsFlowWithReload`, added in 2025.8.0).
 
 ## What you get
 
