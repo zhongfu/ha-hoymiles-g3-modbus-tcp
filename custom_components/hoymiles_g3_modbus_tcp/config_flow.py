@@ -62,3 +62,64 @@ class HoymilesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
+
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        """Return the options flow handler."""
+        return HoymilesOptionsFlowHandler(config_entry)
+
+
+class HoymilesOptionsFlowHandler(config_entries.OptionsFlowWithReload):
+    """Options flow for editing the connection and polling settings."""
+
+    def __init__(self, config_entry):
+        self._config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        errors = {}
+        opts = self._config_entry.options
+        data = self._config_entry.data
+        if user_input is not None:
+            try:
+                inv = Inverter(
+                    InverterConfig(
+                        host=user_input[CONF_HOST],
+                        port=user_input[CONF_PORT],
+                        unit=user_input[CONF_UNIT],
+                    )
+                )
+                await inv.connect()
+                await inv.detect()
+                await inv.close()
+            except Exception:  # noqa: BLE001 - connect failures -> show error
+                errors["base"] = "cannot_connect"
+            else:
+                # OptionsFlowWithReload reloads the entry to apply the changes.
+                return self.async_create_entry(title="", data=user_input)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_HOST,
+                        default=opts.get(CONF_HOST, data.get(CONF_HOST)),
+                    ): str,
+                    vol.Optional(
+                        CONF_PORT,
+                        default=opts.get(CONF_PORT, data.get(CONF_PORT, DEFAULT_PORT)),
+                    ): int,
+                    vol.Optional(
+                        CONF_UNIT,
+                        default=opts.get(CONF_UNIT, data.get(CONF_UNIT, DEFAULT_UNIT)),
+                    ): int,
+                    vol.Optional(
+                        CONF_POLL_INTERVAL,
+                        default=opts.get(
+                            CONF_POLL_INTERVAL,
+                            data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+                        ),
+                    ): int,
+                }
+            ),
+            errors=errors,
+        )

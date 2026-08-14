@@ -10,6 +10,16 @@
           "unit": "Modbus unit ID",
           "poll_interval": "Poll interval (seconds)"
         }
+      },
+      "init": {
+        "title": "Hoymiles G3 Modbus TCP",
+        "description": "Edit the connection and polling settings. Changes are applied by reloading the integration.",
+        "data": {
+          "host": "Host / IP address",
+          "port": "Port",
+          "unit": "Modbus unit ID",
+          "poll_interval": "Poll interval (seconds)"
+        }
       }
     },
     "error": {

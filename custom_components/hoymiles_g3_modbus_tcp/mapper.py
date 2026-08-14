@@ -17,6 +17,7 @@ class RegisterSpec:
     unit: str | None  # V|A|mA|W|kWh|Hz|%|Var|VA|kOhm|°C|None
     state_class: str | None  # measurement|total_increasing|None
     entity_category: str | None  # diagnostic|None
+    precision: int
     enabled_default: bool
 
 
@@ -73,6 +74,14 @@ def _device(r) -> str:
     return "inverter"
 
 
+def _decimals(scale) -> int:
+    """Decimals implied by a power-of-ten scale (value = raw / scale)."""
+    n = int(round(scale))
+    if n >= 1 and n == 10 ** (len(str(n)) - 1):
+        return len(str(n)) - 1
+    return 0
+
+
 def build_register_specs(registers=REGISTERS) -> list[RegisterSpec]:
     specs = []
     for r in registers:
@@ -100,6 +109,7 @@ def build_register_specs(registers=REGISTERS) -> list[RegisterSpec]:
                 unit=unit,
                 state_class=sclass,
                 entity_category=cat,
+                precision=_decimals(r.scale),
                 enabled_default=key not in DISABLED_KEYS,
             )
         )

@@ -89,6 +89,20 @@ class TestMapper(unittest.TestCase):
         # battery_capacity is a rated capacity, not cumulative energy.
         self.assertIsNone(self.by_key["battery_capacity"].state_class)
 
+    def test_precision_matches_scale(self):
+        def decimals(scale):
+            n = int(round(scale))
+            if n >= 1 and n == 10 ** (len(str(n)) - 1):
+                return len(str(n)) - 1
+            return 0
+
+        for r in REGISTERS:
+            self.assertEqual(self.by_key[r.key].precision, decimals(r.scale), r.key)
+        # spot-check the human-meaningful cases
+        self.assertEqual(self.by_key["grid_voltage_a"].precision, 1)   # scale 10
+        self.assertEqual(self.by_key["pv1_current"].precision, 2)      # scale 100
+        self.assertEqual(self.by_key["battery_soc"].precision, 0)      # scale 1
+
     def test_enabled_default_exact(self):
         for r in REGISTERS:
             spec = self.by_key[r.key]

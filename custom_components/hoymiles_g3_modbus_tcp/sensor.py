@@ -75,6 +75,7 @@ class HoymilesSensor(SensorEntity):
         self._attr_state_class = SC_MAP.get(spec.state_class)
         self._attr_entity_category = CAT_MAP.get(spec.entity_category)
         self._attr_entity_registry_enabled_default = spec.enabled_default
+        self._attr_suggested_display_precision = spec.precision
         self._attr_should_poll = False
 
     async def async_added_to_hass(self):
@@ -98,7 +99,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     device_infos = {
         tok: DeviceInfo(
             identifiers={(DOMAIN, f"{entry.unique_id}_{tok}")},
-            name=f"{NAME} {suffix}",
+            name=f"{info.inverter_model or NAME} {suffix}",
             manufacturer=MANUFACTURER,
             model=info.inverter_model or NAME,
         )

@@ -3,6 +3,7 @@
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from hoymiles_g3_modbus_tcp import Inverter, InverterConfig
 
 from .const import (
@@ -17,20 +18,33 @@ from .coordinator import HoymilesCoordinator
 PLATFORMS = [Platform.SENSOR]
 
 
+def _setting(entry: ConfigEntry, key: str, default):
+    """Resolve a setting from entry options, falling back to entry data."""
+    return entry.options.get(key, entry.data.get(key, default))
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a Hoymiles G3 inverter from a config entry."""
-    cfg = entry.data
     inverter = Inverter(
         InverterConfig(
-            host=cfg[CONF_HOST],
-            port=cfg[CONF_PORT],
-            unit=cfg[CONF_UNIT],
+            host=_setting(entry, CONF_HOST, ""),
+            port=_setting(entry, CONF_PORT, 502),
+            unit=_setting(entry, CONF_UNIT, 1),
         )
     )
-    await inverter.connect()
-    await inverter.detect()
+    try:
+        await inverter.connect()
+        await inverter.detect()
+    except ConfigEntryNotReady:
+        raise
+    except Exception as err:  # noqa: BLE001 - transient comm errors -> HA retries
+        raise ConfigEntryNotReady(
+            f"Failed to connect to inverter: {err}"
+        ) from err
     coordinator = HoymilesCoordinator(
-        hass, inverter, cfg[CONF_POLL_INTERVAL]
+        hass,
+        inverter,
+        _setting(entry, CONF_POLL_INTERVAL, 30),
     )
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
