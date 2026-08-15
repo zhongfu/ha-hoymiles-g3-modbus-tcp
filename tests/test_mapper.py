@@ -19,11 +19,9 @@ import mapper  # noqa: E402
 from mapper import (  # noqa: E402
     DISABLED_KEYS,
     ENERGY_KEYS,
-    GRID_METER_KEYS,
     TEMP_KEYS,
+    build_control_specs,
 )
-
-
 class TestMapper(unittest.TestCase):
     def setUp(self):
         self.specs = mapper.build_register_specs()
@@ -42,14 +40,42 @@ class TestMapper(unittest.TestCase):
                 self.assertEqual(spec.device, "battery", r.key)
             elif r.domain == "pv":
                 self.assertEqual(spec.device, "solar", r.key)
-            elif r.key in GRID_METER_KEYS:
+            elif r.domain == "grid_meter":
                 self.assertEqual(spec.device, "grid_meter", r.key)
             else:
                 self.assertEqual(spec.device, "inverter", r.key)
 
     def test_all_devices_present(self):
         devices = {s.device for s in self.specs}
-        self.assertEqual(devices, {"battery", "solar", "grid_meter", "inverter"})
+        self.assertEqual(
+            devices,
+            {"battery", "solar", "grid_meter", "inverter"},
+        )
+
+    def test_controls_cover_settings_domain(self):
+        controls = mapper.build_control_specs()
+        cby = {c.key: c for c in controls}
+        settings_keys = {r.key for r in REGISTERS if r.domain == "settings"}
+        self.assertEqual(set(cby), settings_keys)
+        self.assertEqual(len(controls), len(settings_keys))
+
+    def test_control_kinds_match_enum(self):
+        for c in mapper.build_control_specs():
+            r = next(x for x in REGISTERS if x.key == c.key)
+            if r.enum is not None:
+                self.assertEqual(c.kind, "select", c.key)
+                self.assertEqual(c.options, tuple(r.enum[i] for i in sorted(r.enum)), c.key)
+            else:
+                self.assertEqual(c.kind, "number", c.key)
+                self.assertIsNone(c.options, c.key)
+
+    def test_number_controls_have_sane_bounds(self):
+        for c in mapper.build_control_specs():
+            if c.kind != "number":
+                continue
+            self.assertGreaterEqual(c.min_value, 0, c.key)
+            self.assertGreater(c.max_value, c.min_value, c.key)
+            self.assertGreater(c.step, 0, c.key)
 
     def test_valid_units(self):
         allowed = {"V", "A", "mA", "W", "kWh", "Hz", "%", "Var", "VA", "kOhm", "°C", None}
@@ -65,9 +91,25 @@ class TestMapper(unittest.TestCase):
 
     def test_energy_keys_total_increasing(self):
         for r in REGISTERS:
-            if r.domain == "energy":
+            if r.domain == "energy" and r.unit == "kWh":
                 s = self.by_key[r.key]
                 self.assertEqual(s.state_class, "total_increasing", r.key)
+
+    def test_numeric_flag_matches_enum_bitmap(self):
+        for r in REGISTERS:
+            s = self.by_key[r.key]
+            self.assertEqual(
+                s.numeric, (r.enum is None and r.bitmap is None), r.key
+            )
+
+    def test_energy_power_is_measurement(self):
+        # Energy-domain instantaneous power registers must never be counters.
+        for r in REGISTERS:
+            if r.domain == "energy" and r.unit == "W":
+                s = self.by_key[r.key]
+                self.assertEqual(s.device_class, "power", r.key)
+                self.assertEqual(s.state_class, "measurement", r.key)
+                self.assertIsNone(s.entity_category, r.key)
 
     def test_unitless_non_config_are_diagnostic(self):
         for s in self.specs:

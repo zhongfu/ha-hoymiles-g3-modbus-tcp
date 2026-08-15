@@ -75,8 +75,9 @@ class HoymilesSensor(SensorEntity):
         self._attr_state_class = SC_MAP.get(spec.state_class)
         self._attr_entity_category = CAT_MAP.get(spec.entity_category)
         self._attr_entity_registry_enabled_default = spec.enabled_default
-        self._attr_suggested_display_precision = spec.precision
+        self._attr_suggested_display_precision = spec.precision if spec.numeric else None
         self._attr_should_poll = False
+        self._last_ts = None  # last actual register-read epoch this entity has shown
 
     async def async_added_to_hass(self):
         self.async_on_remove(
@@ -85,7 +86,14 @@ class HoymilesSensor(SensorEntity):
         self._handle_coordinator_update()
 
     def _handle_coordinator_update(self):
-        self._attr_native_value = self.coordinator.data.get(self._spec.key)
+        ts = self.coordinator.inverter.last_updated(self._spec.key)
+        if ts is None or ts == self._last_ts:
+            return  # register not freshly read this tick; keep last_updated stable
+        self._last_ts = ts
+        value = self.coordinator.data.get(self._spec.key)
+        if isinstance(value, list):  # fault-bitmap registers decode to a label list
+            value = ", ".join(str(v) for v in value) or None
+        self._attr_native_value = value
         self.async_write_ha_state()
 
     @property
@@ -96,16 +104,18 @@ class HoymilesSensor(SensorEntity):
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     info = coordinator.inverter.device_info
+    model = info.inverter_model or NAME
     device_infos = {
         tok: DeviceInfo(
             identifiers={(DOMAIN, f"{entry.unique_id}_{tok}")},
-            name=f"{info.inverter_model or NAME} {suffix}",
+            name=f"{model} {suffix}",
             manufacturer=MANUFACTURER,
-            model=info.inverter_model or NAME,
+            model=model,
         )
         for tok, suffix in DEVICE_SUFFIX.items()
     }
-    specs = build_register_specs()
+    # Settings registers are exposed as Number/Select config controls, not sensors.
+    specs = [s for s in build_register_specs() if s.domain != "settings"]
     async_add_entities(
         HoymilesSensor(coordinator, s, device_infos[s.device], entry.unique_id)
         for s in specs

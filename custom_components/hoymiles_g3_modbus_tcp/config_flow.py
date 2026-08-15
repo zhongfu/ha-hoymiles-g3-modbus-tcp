@@ -6,9 +6,11 @@ from homeassistant.const import CONF_HOST
 from hoymiles_g3_modbus_tcp import Inverter, InverterConfig
 
 from .const import (
+    CONF_FULL_POLL_INTERVAL,
     CONF_POLL_INTERVAL,
     CONF_PORT,
     CONF_UNIT,
+    DEFAULT_FULL_POLL_INTERVAL,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_PORT,
     DEFAULT_UNIT,
@@ -58,6 +60,10 @@ class HoymilesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL
                     ): int,
+                    vol.Optional(
+                        CONF_FULL_POLL_INTERVAL,
+                        default=DEFAULT_FULL_POLL_INTERVAL,
+                    ): int,
                 }
             ),
             errors=errors,
@@ -80,20 +86,31 @@ class HoymilesOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         opts = self._config_entry.options
         data = self._config_entry.data
         if user_input is not None:
-            try:
-                inv = Inverter(
-                    InverterConfig(
-                        host=user_input[CONF_HOST],
-                        port=user_input[CONF_PORT],
-                        unit=user_input[CONF_UNIT],
+            conn_changed = (
+                user_input[CONF_HOST] != opts.get(CONF_HOST, data.get(CONF_HOST))
+                or user_input[CONF_PORT]
+                != opts.get(CONF_PORT, data.get(CONF_PORT, DEFAULT_PORT))
+                or user_input[CONF_UNIT]
+                != opts.get(CONF_UNIT, data.get(CONF_UNIT, DEFAULT_UNIT))
+            )
+            if conn_changed:
+                # Only re-validate the connection when it actually changed: the
+                # running coordinator already holds the single Modbus connection,
+                # and a second one to the stick fails (cannot_connect) spuriously.
+                try:
+                    inv = Inverter(
+                        InverterConfig(
+                            host=user_input[CONF_HOST],
+                            port=user_input[CONF_PORT],
+                            unit=user_input[CONF_UNIT],
+                        )
                     )
-                )
-                await inv.connect()
-                await inv.detect()
-                await inv.close()
-            except Exception:  # noqa: BLE001 - connect failures -> show error
-                errors["base"] = "cannot_connect"
-            else:
+                    await inv.connect()
+                    await inv.detect()
+                    await inv.close()
+                except Exception:  # noqa: BLE001 - connect failures -> show error
+                    errors["base"] = "cannot_connect"
+            if not errors:
                 # OptionsFlowWithReload reloads the entry to apply the changes.
                 return self.async_create_entry(title="", data=user_input)
         return self.async_show_form(
@@ -117,6 +134,13 @@ class HoymilesOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                         default=opts.get(
                             CONF_POLL_INTERVAL,
                             data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+                        ),
+                    ): int,
+                    vol.Optional(
+                        CONF_FULL_POLL_INTERVAL,
+                        default=opts.get(
+                            CONF_FULL_POLL_INTERVAL,
+                            data.get(CONF_FULL_POLL_INTERVAL, DEFAULT_FULL_POLL_INTERVAL),
                         ),
                     ): int,
                 }

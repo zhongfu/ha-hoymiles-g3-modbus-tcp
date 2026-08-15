@@ -7,15 +7,18 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from hoymiles_g3_modbus_tcp import Inverter, InverterConfig
 
 from .const import (
+    CONF_FULL_POLL_INTERVAL,
     CONF_HOST,
     CONF_POLL_INTERVAL,
     CONF_PORT,
     CONF_UNIT,
+    DEFAULT_FULL_POLL_INTERVAL,
+    DEFAULT_POLL_INTERVAL,
     DOMAIN,
 )
 from .coordinator import HoymilesCoordinator
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT]
 
 
 def _setting(entry: ConfigEntry, key: str, default):
@@ -44,7 +47,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = HoymilesCoordinator(
         hass,
         inverter,
-        _setting(entry, CONF_POLL_INTERVAL, 30),
+        _setting(entry, CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+        _setting(entry, CONF_FULL_POLL_INTERVAL, DEFAULT_FULL_POLL_INTERVAL),
     )
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator

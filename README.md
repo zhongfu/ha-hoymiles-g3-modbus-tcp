@@ -2,10 +2,9 @@
 
 *AI slop disclaimer: this thing was written by deepseek-v4-flash-0731 with input from me.*
 
-Home Assistant custom integration for the **Hoymiles G3 hybrid inverter** (HIT-G3
-series via the DTS-WL-G3 Ethernet stick). It wraps the read-only PyPI library
-[`hoymiles-g3-modbus-tcp`](https://pypi.org/project/hoymiles-g3-modbus-tcp/) and
-exposes the inverter's input registers as Home Assistant sensors.
+Home Assistant integration for the **Hoymiles G3 hybrid inverter** (HIT-G3 series)
+read through a **DTS-WL-G3 Ethernet stick**. It reads the inverter over Modbus/TCP
+and shows its live measurements in Home Assistant.
 
 The integration is **read-only** — it never writes to the inverter.
 
@@ -22,62 +21,62 @@ The integration is **read-only** — it never writes to the inverter.
 
 Add this repository as a **custom repository** (HACS → ⋯ → **Custom repositories** →
 `https://github.com/zhongfu/ha-hoymiles-g3-modbus-tcp`, category **Integration**),
-then install **"Hoymiles G3 Modbus TCP"** from the HACS integrations store and add it
-via **Settings → Devices & Services → Add Integration**.
+install **"Hoymiles G3 Modbus TCP"** from HACS, then add it via **Settings → Devices &
+Services → Add Integration**.
 
 ### Manual
 
-1. Copy the `custom_components/hoymiles_g3_modbus_tcp` directory into your Home
-   Assistant `config/custom_components/` directory.
+1. Copy the `custom_components/hoymiles_g3_modbus_tcp` folder into your Home
+   Assistant `config/custom_components/` folder.
 2. Restart Home Assistant.
 3. Add the integration via **Settings → Devices & Services → Add Integration →
-   "Hoymiles G3 Modbus TCP"** and enter the Ethernet stick's IP address. The default
-   port is `502`, unit `1`, and the poll interval defaults to `30 s`. You can change
-   any of these later via **Settings → Devices & Services → ⋯ → Options** on the
-   integration (changes reload the integration to reconnect with the new settings).
-
-> **Dependency:** the pinned `hoymiles-g3-modbus-tcp==0.1.2` is installed
-> automatically by Home Assistant on first setup (needs internet). Since 0.1.1 it
-> requires only `pymodbus>=3.13.1`, compatible with the `pymodbus==3.13.1` that Home
-> Assistant ships, so it installs without manual intervention.
-
-> **Requirements:** Home Assistant **2025.8 or newer** (the options flow uses
-> `OptionsFlowWithReload`, added in 2025.8.0).
+   "Hoymiles G3 Modbus TCP"** and enter your Ethernet stick's IP address. Defaults:
+   port `502`, unit `1`, and a poll interval of 30 seconds. You can change any of
+   these later under **Settings → Devices & Services → ⋯ → Options** (the integration
+   reloads to apply the new settings).
 
 ## What you get
 
-Each config entry is split into **four Home Assistant devices**:
+Your inverter's data is organised into **four devices**:
 
-| Device | Contents |
-|--------|----------|
-| **Battery** | battery-domain registers (SOC, voltage, current, power, cell temps, etc.) |
-| **Solar** | PV-domain registers (per-string and total power, voltage, current) |
-| **Grid Meter** | `grid_meter_link`, `pv_meter_link`, `drm_status` |
-| **Inverter** | everything else (grid/AC/backup/generator/energy, meter currents/voltages/freq, inverter status, diagnostics) |
+| Device | Shows |
+|--------|-------|
+| **Battery** | battery state and measurements — charge level, voltage, current, power, cell temperatures, etc. |
+| **Solar** | PV per-string and total power, voltage and current |
+| **Grid Meter** | the external grid and PV meter readings (per-phase and total voltage, current, power, power factor, frequency, link status) |
+| **Inverter** | everything else — mains/AC/backup/generator/energy, status and diagnostics |
 
-All **145 registers** are exposed as sensors — nothing is dropped. Low-value diagnostic
-registers (fans, aux supplies, fault codes, bus/DC-inject voltages, firmware versions,
-…) are **disabled by default** so they don't clutter the UI; you can enable any of them
-from the entity settings.
+Read-only settings (export limits, SOC range, EMS/SOC limits, EPS/PV island mode,
+battery type, topology, …) show up as **Configuration** controls (sliders and
+dropdowns) on the **Inverter** device, keeping them out of the live readings. Because
+data flows one way, those controls are read-only for now.
 
-Every register with a unit gets an appropriate device class and `measurement` state
-class; energy-domain registers are `total_increasing` kWh counters.
+Nothing is dropped — every reading is exposed. Diagnostics you rarely need (fans, aux
+rails, fault codes, bus voltages, firmware versions, …) are **off by default** so they
+don't clutter the UI; turn any of them on from the entity settings. Energy readings
+are shown as lifetime totals.
 
 ## Polling
 
-The inverter is polled on the configured interval (default 30 s). Each poll reads all
-registers and takes roughly two seconds. If you also run the poller from the
-`hoymiles-g3-modbus-tcp` tool, both may cause occasional transient Modbus errors on the
-stick — the coordinator tolerates partial reads.
+Fast-moving measurements (powers, currents, voltages, frequency, meters) refresh
+often — every `poll_interval` (default 30 seconds). A slower **full poll** — every
+`full_poll_interval` (default 300 seconds / 5 minutes) — reads everything else:
+energy totals, status, battery parameters and the settings controls. Each reading
+only updates when it's actually polled, so the "last updated" time you see reflects
+the real read cadence.
+
+If the same inverter is also being polled by the `hoymiles-g3-modbus-tcp` tool, you
+may occasionally see brief reading errors on the stick — the integration tolerates
+these.
 
 ## Development
 
-The mapper (`mapper.py`) is pure Python with no Home Assistant imports and is covered
-by unit tests that run without Home Assistant installed:
+`mapper.py` is pure Python with no Home Assistant imports, covered by unit tests that
+run without Home Assistant:
 
 ```sh
 python3 -m unittest discover -s tests -v
 ```
 
-Requires `hoymiles-g3-modbus-tcp` (and `pymodbus`) importable — either pip-installed or
-present as a sibling directory `../hoymiles-g3-modbus-tcp`.
+Requires `hoymiles-g3-modbus-tcp` (and `pymodbus`) importable — either pip-installed
+or present as a sibling folder `../hoymiles-g3-modbus-tcp`.

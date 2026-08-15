@@ -3,9 +3,9 @@
   "name": "Hoymiles G3 Modbus TCP",
   "codeowners": ["@zhongfu"],
   "config_flow": true,
-  "requirements": ["hoymiles-g3-modbus-tcp==0.1.2"],
+  "requirements": ["hoymiles-g3-modbus-tcp==0.2.1"],
   "issue_tracker": "https://github.com/zhongfu/ha-hoymiles-g3-modbus-tcp/issues",
   "iot_class": "local_polling",
   "integration_type": "device",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
