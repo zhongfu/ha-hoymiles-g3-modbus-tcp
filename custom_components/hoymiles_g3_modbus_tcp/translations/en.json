@@ -5,22 +5,35 @@
         "title": "Hoymiles G3 Modbus TCP",
         "description": "Enter the IP address (and optional port/unit) of your Hoymiles DTS-WL-G3 Ethernet stick.",
         "data": {
-          "host": "Host / IP address",
+          "host": "Host/IP address",
           "port": "Port",
           "unit": "Modbus unit ID",
-          "poll_interval": "Poll interval (seconds)",
+          "poll_interval": "Fast poll interval (seconds)",
           "full_poll_interval": "Full poll interval (seconds)"
+        },
+        "data_description": {
+          "unit": "Default unit ID is 1."
         }
-      },
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the inverter. Check the host and port."
+    }
+  },
+  "options": {
+    "step": {
       "init": {
         "title": "Hoymiles G3 Modbus TCP",
         "description": "Edit the connection and polling settings. Changes are applied by reloading the integration.",
         "data": {
-          "host": "Host / IP address",
+          "host": "Host/IP address",
           "port": "Port",
           "unit": "Modbus unit ID",
-          "poll_interval": "Poll interval (seconds)",
+          "poll_interval": "Fast poll interval (seconds)",
           "full_poll_interval": "Full poll interval (seconds)"
+        },
+        "data_description": {
+          "unit": "Default unit ID is 1."
         }
       }
     },
