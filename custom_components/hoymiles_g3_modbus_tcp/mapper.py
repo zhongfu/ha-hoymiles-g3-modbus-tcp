@@ -6,6 +6,7 @@ This module MUST NOT import homeassistant — it is unit-tested standalone.
 from dataclasses import dataclass
 
 from hoymiles_g3_modbus_tcp.registers import REGISTERS
+from hoymiles_g3_modbus_tcp.groups import GROUPS
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,37 @@ TEMP_KEYS = {
 }
 
 ENERGY_KEYS = {r.key for r in REGISTERS if r.domain == "energy"}
+
+_FAST_RANGES = GROUPS["fast"][0]
+_BY_KEY = {r.key: r for r in REGISTERS}
+
+
+def _fast_covered(r, memo):
+    """True if a register is freshly refreshed on every (fast) poll.
+    Physical-register classification is by POLL COVERAGE, NOT semantic group: a
+    register is fast-class iff its own address falls inside a fast input range,
+    even if it "belongs" to a slow group (e.g. a status/diagnostics register at
+    an address within 0-123 or 30000-30021 is physically read by every fast tick,
+    so it debounces on fast failures — the user-facing behavior required).
+    Derived (synthetic) registers: fast-class iff all their source registers are
+    fast-covered. Holding/settings registers are never fast-class (the fast group
+    reads no holding registers).
+    """
+    key = r.key
+    if key in memo:
+        return memo[key]
+    if r.source:
+        result = all(_fast_covered(_BY_KEY[s], memo) for s in r.source)
+    else:
+        result = (r.kind == "input") and any(
+            lo <= r.addr < hi for lo, hi in _FAST_RANGES
+        )
+    memo[key] = result
+    return result
+
+
+_memo: dict[str, bool] = {}
+FAST_KEYS = frozenset(r.key for r in REGISTERS if _fast_covered(r, _memo))
 
 # Low-value entities disabled by default (users can enable them).
 DISABLED_KEYS = {

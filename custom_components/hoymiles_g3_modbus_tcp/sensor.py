@@ -19,8 +19,8 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN, MANUFACTURER, NAME
-from .mapper import build_register_specs
+from .const import DOMAIN, MANUFACTURER, NAME, UNAVAILABLE_AFTER_FAILURES
+from .mapper import FAST_KEYS, build_register_specs
 
 DC_MAP = {
     "voltage": SensorDeviceClass.VOLTAGE,
@@ -78,6 +78,8 @@ class HoymilesSensor(SensorEntity):
         self._attr_suggested_display_precision = spec.precision if spec.numeric else None
         self._attr_should_poll = False
         self._last_ts = None  # last actual register-read epoch this entity has shown
+        self._full_only = spec.key not in FAST_KEYS
+        self._last_available = self.available
 
     async def async_added_to_hass(self):
         self.async_on_remove(
@@ -87,18 +89,22 @@ class HoymilesSensor(SensorEntity):
 
     def _handle_coordinator_update(self):
         ts = self.coordinator.inverter.last_updated(self._spec.key)
-        if ts is None or ts == self._last_ts:
-            return  # register not freshly read this tick; keep last_updated stable
-        self._last_ts = ts
-        value = self.coordinator.data.get(self._spec.key)
-        if isinstance(value, list):  # fault-bitmap registers decode to a label list
-            value = ", ".join(str(v) for v in value) or None
-        self._attr_native_value = value
-        self.async_write_ha_state()
+        if ts is not None and ts != self._last_ts:
+            self._last_ts = ts
+            value = self.coordinator.data.get(self._spec.key)
+            if isinstance(value, list):  # fault-bitmap registers decode to a label list
+                value = ", ".join(str(v) for v in value) or None
+            self._attr_native_value = value
+            self.async_write_ha_state()
+        elif self.available != self._last_available:
+            self.async_write_ha_state()
+        self._last_available = self.available
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success
+        if self._full_only:
+            return self.coordinator.full_failures < UNAVAILABLE_AFTER_FAILURES
+        return self.coordinator.fast_failures < UNAVAILABLE_AFTER_FAILURES
 
 
 async def async_setup_entry(hass, entry, async_add_entities):

@@ -19,6 +19,7 @@ import mapper  # noqa: E402
 from mapper import (  # noqa: E402
     DISABLED_KEYS,
     ENERGY_KEYS,
+    FAST_KEYS,
     TEMP_KEYS,
     build_control_specs,
 )
@@ -163,6 +164,37 @@ class TestMapper(unittest.TestCase):
         # HA disallows EntityCategory.CONFIG on sensor entities.
         for s in self.specs:
             self.assertIn(s.entity_category, (None, "diagnostic"), s.key)
+
+    def test_fast_keys_follows_physical_fast_coverage(self):
+        """FAST_KEYS classifies by poll coverage, not semantic group."""
+        self.assertTrue(FAST_KEYS, "FAST_KEYS must not be empty")
+        fast_ranges = ((0, 123), (1800, 1924), (2000, 2246), (30000, 30021))
+
+        def _in_fast(r):
+            return any(lo <= r.addr < hi for lo, hi in fast_ranges)
+
+        fast_inputs = [r for r in REGISTERS if r.kind == "input" and _in_fast(r)]
+        self.assertTrue(fast_inputs, "no fast-range input register found")
+        fast_key = next(r.key for r in fast_inputs)
+        self.assertIn(fast_key, FAST_KEYS, fast_key)
+
+        holdings = [r for r in REGISTERS if r.kind == "holding"]
+        self.assertTrue(holdings, "no holding register found")
+        full_key = next(r.key for r in holdings)
+        self.assertNotIn(full_key, FAST_KEYS, full_key)
+
+        self.assertIn("pv_total_power", FAST_KEYS)
+
+        overlaps = [
+            r.key
+            for r in REGISTERS
+            if r.domain in ("diagnostics", "status") and _in_fast(r)
+            and r.key in FAST_KEYS
+        ]
+        self.assertTrue(
+            overlaps,
+            "status/diagnostics register inside a fast range must be fast-class",
+        )
 
 
 if __name__ == "__main__":
